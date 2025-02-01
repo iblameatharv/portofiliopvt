@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Atharv's DataBase Terminal</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+
+        :root {
+            --primary: #00ff00;
+            --background: #000000;
+            --scanline-size: 2px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'VT323', monospace;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--background);
+            color: var(--primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+            text-shadow: 0 0 5px rgba(0, 255, 0, 0.7);
+        }
+
+        #loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--background);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+
+        #boot-logs {
+            width: 80%;
+            height: 60%;
+            overflow-y: auto;
+            padding: 20px;
+            border: 2px solid var(--primary);
+            margin-bottom: 20px;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        #loading-progress {
+            width: 80%;
+            height: 20px;
+            border: 2px solid var(--primary);
+            margin-top: 20px;
+        }
+
+        #loading-bar {
+            width: 0;
+            height: 100%;
+            background-color: var(--primary);
+            transition: width 0.5s ease-in-out;
+        }
+
+        #terminal, #gui-mode {
+            min-height: 100vh;
+            transition: opacity 0.5s ease-in-out;
+        }
+
+        /* Terminal Styles */
+        #terminal {
+            padding: 20px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            display: none;
+        }
+
+        #output {
+            margin-bottom: 20px;
+            white-space: pre-wrap;
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        #input-line {
+            display: flex;
+            align-items: center;
+        }
+
+        #command-input {
+            background: transparent;
+            border: none;
+            color: var(--primary);
+            font-family: 'VT323', monospace;
+            font-size: 1.5rem;
+            font-weight: bold;
+            flex-grow: 1;
+            outline: none;
+        }
+
+        /* GUI Mode Styles */
+        #gui-mode {
+            display: none;
+            padding: 20px;
+            position: relative;
+            animation: bootUp 1s ease-out;
+        }
+
+        .content-section {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .nav-menu {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 40px;
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 10px;
+        }
+
+        .nav-item {
+            color: var(--primary);
+            text-decoration: none;
+            font-size: 1.5rem;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .nav-item:hover {
+            text-shadow: 0 0 10px var(--primary);
+        }
+
+        .nav-item::after {
+            content: '';
+            position: absolute;
+            bottom: -12px;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background-color: var(--primary);
+            transform: scaleX(0);
+            transition: transform 0.3s ease;
+        }
+
+        .nav-item:hover::after {
+            transform: scaleX(1);
+        }
+
+        .section {
+            margin-bottom: 40px;
+            display: none;
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        .section.active {
+            display: block;
+        }
+
+        .section h2 {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px var(--primary);
+        }
+
+        .section p {
+            font-size: 1.2rem;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+
+        .project-card {
+            border: 2px solid var(--primary);
+            padding: 15px;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+            background: rgba(0, 255, 0, 0.05);
+        }
+
+        .project-card:hover {
+            transform: translateX(10px);
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.2);
+        }
+
+        .contact-form {
+            display: grid;
+            gap: 15px;
+        }
+
+        .contact-form input,
+        .contact-form textarea {
+            background: rgba(0, 255, 0, 0.1);
+            border: 2px solid var(--primary);
+            color: var(--primary);
+            padding: 10px;
+            font-family: 'VT323', monospace;
+            font-size: 1.2rem;
+        }
+
+        .contact-form button {
+            background: var(--primary);
+            color: var(--background);
+            border: none;
+            padding: 10px 20px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .contact-form button:hover {
+            background: var(--background);
+            color: var(--primary);
+            border: 2px solid var(--primary);
+        }
+
+        /* Retro Effects */
+        .scanlines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                to bottom,
+                rgba(0, 255, 0, 0.03),
+                rgba(0, 255, 0, 0.03) 1px,
+                transparent 1px,
+                transparent 2px
+            );
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        .crt {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 3;
+        }
+
+        .crt::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(
+                circle at center,
+                rgba(0, 255, 0, 0.08) 0%,
+                rgba(0, 0, 0, 0.3) 100%
+            );
+            pointer-events: none;
+        }
+
+        /* Matrix Rain Effect */
+        #matrix-rain {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+            opacity: 0.1;
+        }
+
+        /* 3D Animation Container */
+        #three-d-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* Animations */
+        @keyframes bootUp {
+            0% {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+            50% {
+                opacity: 0.5;
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes glitch {
+            0% {
+                transform: translate(0);
+            }
+            20% {
+                transform: translate(-2px, 2px);
+            }
+            40% {
+                transform: translate(-2px, -2px);
+            }
+            60% {
+                transform: translate(2px, 2px);
+            }
+            80% {
+                transform: translate(2px, -2px);
+            }
+            100% {
+                transform: translate(0);
+            }
+        }
+
+        .glitch {
+            animation: glitch 0.3s infinite;
+        }
+
+        /* New styles for enhanced retro look */
+        .retro-border {
+            border: 2px solid var(--primary);
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+        }
+
+        .retro-button {
+            background: var(--primary);
+            color: var(--background);
+            border: none;
+            padding: 10px 20px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .retro-button:hover {
+            background: var(--background);
+            color: var(--primary);
+            border: 2px solid var(--primary);
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.5);
+        }
+
+        /* New animation for text */
+        @keyframes textFlicker {
+            0% {
+                opacity: 0.1;
+            }
+            2% {
+                opacity: 1;
+            }
+            8% {
+                opacity: 0.1;
+            }
+            9% {
+                opacity: 1;
+            }
+            12% {
+                opacity: 0.1;
+            }
+            20% {
+                opacity: 1;
+            }
+            25% {
+                opacity: 0.3;
+            }
+            30% {
+                opacity: 1;
+            }
+            70% {
+                opacity: 0.7;
+            }
+            72% {
+                opacity: 0.2;
+            }
+            77% {
+                opacity: 0.9;
+            }
+            100% {
+                opacity: 0.9;
+            }
+        }
+
+        .flicker-text {
+            animation: textFlicker 3s linear infinite;
+        }
+
+        /* Autocomplete styles */
+        #autocomplete {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid var(--primary);
+            max-height: 150px;
+            overflow-y: auto;
+            display: none;
+        }
+
+        #autocomplete div {
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+
+        #autocomplete div:hover,
+        #autocomplete div.selected {
+            background: rgba(0, 255, 0, 0.2);
+        }
+
+        /* New styles for code editor */
+        #code-editor {
+            width: 100%;
+            height: 300px;
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            padding: 10px;
+            border: 1px solid var(--primary);
+            resize: vertical;
+        }
+
+        /* New styles for Python output */
+        #python-output {
+            width: 100%;
+            height: 150px;
+            background-color: #2d2d2d;
+            color: #ffffff;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            padding: 10px;
+            border: 1px solid var(--primary);
+            margin-top: 10px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading-screen">
+        <div id="boot-logs"></div>
+        <div id="three-d-container"></div>
+        <div id="loading-progress">
+            <div id="loading-bar"></div>
+        </div>
+    </div>
+
+    <div class="scanlines"></div>
+    <div class="crt"></div>
+
+    <div id="terminal">
+        <div id="output"></div>
+        <div id="input-line">
+            <span id="prompt">root@welcome></span>
+            <input type="text" id="command-input" autofocus>
+        </div>
+        <div id="autocomplete"></div>
+    </div>
+
+    <div id="gui-mode">
+        <div class="content-section">
+            <nav class="nav-menu">
+                <a href="#about" class="nav-item" onclick="showSection('about')">ABOUT</a>
+                <a href="#projects" class="nav-item" onclick="showSection('projects')">PROJECTS</a>
+                <a href="#contact" class="nav-item" onclick="showSection('contact')">CONTACT</a>
+                <a href="#code" class="nav-item" onclick="showSection('code')">CODE</a>
+                <a href="#" class="nav-item" onclick="returnToTerminal()">TERMINAL</a>
+            </nav>
+
+            <div id="about" class="section active retro-border">
+                <h2 class="flicker-text">&gt; ABOUT_ME.exe</h2>
+                <p>Hello, I'm Atharv Verma! I'm a 16-year-old student at Delhi Public School, Rudrapur.</p>
+                <p>I have 4 years of experience in Computer Programming and have learned languages like Python, as well as skills in Web Designing.</p>
+                <p>I'm currently studying for my Class 10th Board Examination and learning Machine Learning to create my own Open Source LLM Model named Somay.ai.</p>
+                <p>I created this website using HTML, JavaScript, and CSS. I hope you like it!</p>
+                <p>You can contact me at:</p>
+                <p>Email: atharvverma50@gmail.com</p>
+                <p>Instagram: yoo_atharvv</p>
+            </div>
+
+            <div id="projects" class="section">
+                <h2 class="flicker-text">&gt; MY_PROJECTS.exe</h2>
+                <div class="project-card retro-border">
+                    <h3>Orrey Space App</h3>
+                    <p>A groundbreaking space visualization project crafted with HTML, JavaScript, and CSS. 
+                    This pioneering endeavor represents my first venture into web development, 
+                    currently under active development to create an immersive astronomical experience.</p>
+                    <a href="https://github.com/iblameatharv/OrreySpaceApp" target="_blank" class="retro-button">View Source</a>
+                </div>
+                <div class="project-card retro-border">
+                    <h3>ASCII Video Player</h3>
+                    <p>A terminal-based video player that converts regular videos into ASCII art. 
+                    Created using Python, this project transforms visual content into text-based displays.</p>
+                    <a href="https://github.com/iblameatharv/VIDEO-to-ASCII-Character-in-Python" target="_blank" class="retro-button">View Source</a>
+                </div>
+            </div>
+
+            <div id="contact" class="section">
+                <h2 class="flicker-text">&gt; CONTACT_ME.exe</h2>
+                <form class="contact-form retro-border" action="https://formsubmit.co/atharvverma50@gmail.com" method="POST">
+                    <input type="hidden" name="_next" value="https://your-website.com/thanks.html">
+                    <input type="hidden" name="_subject" value="New submission from your portfolio!">
+                    <input type="text" name="name" placeholder="Enter your name" required>
+                    <input type="email" name="email" placeholder="Enter your email" required>
+                    <textarea name="message" rows="5" placeholder="Your message" required></textarea>
+                    <button type="submit" class="retro-button">SEND_MESSAGE.exe</button>
+                </form>
+            </div>
+
+            <div id="code" class="section">
+                <h2 class="flicker-text">&gt; CODE_EDITOR.exe</h2>
+                <textarea id="code-editor" placeholder="Enter your Python code here..."></textarea>
+                <button onclick="runPythonCode()" class="retro-button">RUN_CODE.exe</button>
+                <div id="python-output"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.22.1/full/pyodide.js"></script>
+    <script>
+        // Loading screen and boot sequence
+        const loadingScreen = document.getElementById('loading-screen');
+        const bootLogs = document.getElementById('boot-logs');
+        const loadingBar = document.getElementById('loading-bar');
+        const terminal = document.getElementById('terminal');
+        const output = document.getElementById('output');
+        const commandInput = document.getElementById('command-input');
+        const guiMode = document.getElementById('gui-mode');
+        const autocompleteDiv = document.getElementById('autocomplete');
+
+        const bootMessages = [
+            "Initializing core system modules...",
+            "Loading kernel v5.13.1...",
+            "Mounting root filesystem...",
+            "Starting system services...",
+            "Initializing network interfaces...",
+            "Loading graphics drivers...",
+            "Starting user interface...",
+            "System boot complete.",
+            "Welcome to Atharv's DataBase Terminal"
+        ];
+
+        let currentLog = 0;
+        let loadingProgress = 0;
+
+        function simulateBooting() {
+            if (currentLog < bootMessages.length) {
+                bootLogs.innerHTML += bootMessages[currentLog] + "<br>";
+                bootLogs.scrollTop = bootLogs.scrollHeight;
+                currentLog++;
+                loadingProgress = (currentLog / bootMessages.length) * 100;
+                loadingBar.style.width = loadingProgress + "%";
+                setTimeout(simulateBooting, Math.random() * 500 + 200);
+            } else {
+                setTimeout(() => {
+                    loadingScreen.style.display = 'none';
+                    terminal.style.display = 'block';
+                    initTerminal();
+                }, 1000);
+            }
+        }
+
+        // 3D Animation
+        let scene, camera, renderer, cube, sphere, torus;
+
+        function init3DAnimation() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.getElementById('three-d-container').appendChild(renderer.domElement);
+
+            const cubeGeometry = new THREE.BoxGeometry();
+            const sphereGeometry = new THREE.SphereGeometry(0.7, 32, 32);
+            const torusGeometry = new THREE.TorusGeometry(0.5, 0.2, 16, 100);
+            const material = new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true });
+
+            cube = new THREE.Mesh(cubeGeometry, material);
+            sphere = new THREE.Mesh(sphereGeometry, material);
+            torus = new THREE.Mesh(torusGeometry, material);
+
+            cube.position.x = -2;
+            torus.position.x = 2;
+
+            scene.add(cube);
+            scene.add(sphere);
+            scene.add(torus);
+
+            camera.position.z = 5;
+        }
+
+        function animate3D() {
+            requestAnimationFrame(animate3D);
+            cube.rotation.x += 0.01;
+            cube.rotation.y += 0.01;
+            sphere.rotation.x += 0.01;
+            sphere.rotation.y += 0.01;
+            torus.rotation.x += 0.01;
+            torus.rotation.y += 0.01;
+            renderer.render(scene, camera);
+        }
+
+        // Terminal functionality
+        function initTerminal() {
+            const welcomeMessage = `Atharv [Version 10.0.22631.4317]
+(c) Github.com. All rights reserved.
+Write Help to get help or Start to Start GUI Mode
+
+root@welcome>`;
+
+            output.textContent = welcomeMessage;
+        }
+
+        // Command handling
+        const commands = {
+            help: `Available commands:
+    help     - Show this help message
+    start    - Start GUI Mode
+    clear    - Clear terminal
+    about    - About me
+    projects - My projects
+    contact  - Contact information
+    github   - Open GitHub profile
+    social   - Social media links
+    time     - Show current time
+    echo     - Echo a message
+    color    - Change terminal color (green/red/blue)
+    matrix   - Start Matrix rain effect
+    stopmatrix - Stop Matrix rain effect
+    elapsed  - Show elapsed time
+    3d       - Toggle 3D animation
+    python   - Run Python in browser
+    neovim   - Open Neovim-like editor
+    `,
+            about: `Hello! I'm Atharv, a passionate programmer and designer.
+Currently working on innovative web and software solutions.
+Type 'projects' to see my work or 'contact' for my details.`,
+            projects: `My Projects:
+
+1. Orrey Space App
+   A space visualization project using HTML, JS, and CSS
+   GitHub: https://github.com/iblameatharv/OrreySpaceApp
+
+2. ASCII Video Player
+   Convert videos to ASCII art in terminal
+   GitHub: https://github.com/iblameatharv/VIDEO-to-ASCII-Character-in-Python`,
+            contact: `Contact Information:
+Email: atharvverma50@gmail.com
+Instagram: @yoo_atharvv`,
+            social: `Social Media Links:
+GitHub: https://github.com/iblameatharv
+Instagram: https://instagram.com/yoo_atharvv`,
+            matrix: `Starting Matrix rain effect...`,
+            stopmatrix: `Stopping Matrix rain effect...`,
+            elapsed: `Showing elapsed time...`,
+            '3d': `Toggling 3D animation...`,
+            python: `Switching to Python mode...`,
+            neovim: `Opening Neovim-like editor...`
+        };
+
+        function handleCommand(command) {
+            const [cmd, ...args] = command.toLowerCase().trim().split(' ');
+            let response = '';
+
+            switch(cmd) {
+                case 'help':
+                    response = commands.help;
+                    break;
+                case 'start':
+                    startGUIMode();
+                    return;
+                case 'clear':
+                    output.textContent = '';
+                    return;
+                case 'about':
+                    response = commands.about;
+                    break;
+                case 'projects':
+                    response = commands.projects;
+                    break;
+                case 'contact':
+                    response = commands.contact;
+                    break;
+                case 'social':
+                    response = commands.social;
+                    break;
+                case 'github':
+                    window.open('https://github.com/iblameatharv', '_blank');
+                    response = 'Opening GitHub profile...';
+                    break;
+                case 'time':
+                    response = new Date().toLocaleString();
+                    break;
+                case 'echo':
+                    response = args.join(' ') || 'Please provide a message to echo';
+                    break;
+                case 'color':
+                    const color = args[0];
+                    if(['green', 'red', 'blue'].includes(color)) {
+                        document.documentElement.style.setProperty('--primary', 
+                            color === 'green' ? '#00ff00' : 
+                            color === 'red' ? '#ff0000' : '#00ffff');
+                        response = `Admin Switched Color to ${color}`;
+                    } else {
+                        response = 'Available colors: green, red, blue';
+                    }
+                    break;
+                case 'matrix':
+                    startMatrixRain();
+                    response = commands.matrix;
+                    break;
+                case 'stopmatrix':
+                    stopMatrixRain();
+                    response = commands.stopmatrix;
+                    break;
+                case 'elapsed':
+                    showElapsedTime();
+                    response = commands.elapsed;
+                    break;
+                case '3d':
+                    toggle3DAnimation();
+                    response = commands['3d'];
+                    break;
+                case 'python':
+                    startGUIMode();
+                    showSection('code');
+                    response = commands.python;
+                    break;
+                case 'neovim':
+                    startNeovimEditor();
+                    response = commands.neovim;
+                    break;
+                default:
+                    response = `Command not found: ${command}\nType "help" for available commands`;
+            }
+
+            output.textContent += `\nroot@welcome> ${command}\n${response}`;
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+
+        // Autocomplete functionality
+        const availableCommands = Object.keys(commands);
+
+        function showAutocomplete(input) {
+            const matchingCommands = availableCommands.filter(cmd => cmd.startsWith(input.toLowerCase()));
+            if (matchingCommands.length > 0) {
+                autocompleteDiv.innerHTML = matchingCommands.map(cmd => `<div>${cmd}</div>`).join('');
+                autocompleteDiv.style.display = 'block';
+            } else {
+                autocompleteDiv.style.display = 'none';
+            }
+        }
+
+        let selectedAutocompleteIndex = -1;
+
+        // Input handling
+        commandInput.addEventListener('input', function() {
+            showAutocomplete(this.value);
+            selectedAutocompleteIndex = -1;
+        });
+
+        commandInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                handleCommand(this.value);
+                this.value = '';
+                autocompleteDiv.style.display = 'none';
+            } else if (e.key === 'Tab') {
+                e.preventDefault();
+                const matchingCommands = availableCommands.filter(cmd => cmd.startsWith(this.value.toLowerCase()));
+                if (matchingCommands.length > 0) {
+                    this.value = matchingCommands[0];
+                    autocompleteDiv.style.display = 'none';
+                }
+            } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                const items = autocompleteDiv.children;
+                if (items.length > 0) {
+                    selectedAutocompleteIndex = (selectedAutocompleteIndex + 1) % items.length;
+                    updateAutocompleteSelection();
+                }
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                const items = autocompleteDiv.children;
+                if (items.length > 0) {
+                    selectedAutocompleteIndex = (selectedAutocompleteIndex - 1 + items.length) % items.length;
+                    updateAutocompleteSelection();
+                }
+            }
+        });
+
+        function updateAutocompleteSelection() {
+            const items = autocompleteDiv.children;
+            for (let i = 0; i < items.length; i++) {
+                if (i === selectedAutocompleteIndex) {
+                    items[i].classList.add('selected');
+                    commandInput.value = items[i].textContent;
+                } else {
+                    items[i].classList.remove('selected');
+                }
+            }
+        }
+
+        autocompleteDiv.addEventListener('click', function(e) {
+            if (e.target.tagName === 'DIV') {
+                commandInput.value = e.target.textContent;
+                autocompleteDiv.style.display = 'none';
+                commandInput.focus();
+            }
+        });
+
+        // GUI Mode functions
+        function startGUIMode() {
+            terminal.style.opacity = 0;
+            setTimeout(() => {
+                terminal.style.display = 'none';
+                guiMode.style.display = 'block';
+                setTimeout(() => {
+                    guiMode.style.opacity = 1;
+                }, 50);
+            }, 500);
+        }
+
+        function returnToTerminal() {
+            guiMode.style.opacity = 0;
+            setTimeout(() => {
+                guiMode.style.display = 'none';
+                terminal.style.display = 'block';
+                setTimeout(() => {
+                    terminal.style.opacity = 1;
+                    commandInput.focus();
+                }, 50);
+            }, 500);
+        }
+
+        function showSection(sectionId) {
+            document.querySelectorAll('.section').forEach(section => {
+                section.classList.remove('active');
+            });
+            document.getElementById(sectionId).classList.add('active');
+        }
+
+        // Add glitch effect randomly
+        setInterval(() => {
+            const elements = document.querySelectorAll('h2');
+            elements.forEach(el => {
+                if (Math.random() > 0.99) {
+                    el.classList.add('glitch');
+                    setTimeout(() => el.classList.remove('glitch'), 300);
+                }
+            });
+        }, 100);
+
+        // Keep focus on input when clicking anywhere in terminal
+        terminal.addEventListener('click', () => {
+            commandInput.focus();
+        });
+
+        // Handle contact form submission
+        document.querySelector('.contact-form').addEventListener('submit', function(e) {
+            const button = this.querySelector('button');
+            button.textContent = 'SENDING...';
+            
+            setTimeout(() => {
+                button.textContent = 'MESSAGE_SENT.exe';
+                setTimeout(() => {
+                    button.textContent = 'SEND_MESSAGE.exe';
+                }, 2000);
+            }, 1500);
+        });
+
+        // Matrix Rain Effect
+        let matrixInterval;
+        let elapsedInterval;
+        let startTime;
+
+        function startMatrixRain() {
+            const canvas = document.createElement('canvas');
+            canvas.id = 'matrix-rain';
+            document.body.appendChild(canvas);
+            const ctx = canvas.getContext('2d');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*()_+-=[]{}|;:,.<>?';
+            const columns = canvas.width / 20;
+            const drops = [];
+
+            for (let i = 0; i < columns; i++) {
+                drops[i] = 1;
+            }
+
+            function draw() {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#0F0';
+                ctx.font = '20px monospace';
+
+                for (let i = 0; i < drops.length; i++) {
+                    const text = characters[Math.floor(Math.random() * characters.length)];
+                    ctx.fillText(text, i * 20, drops[i] * 20);
+                    if (drops[i] * 20 > canvas.height && Math.random() > 0.975) {
+                        drops[i] = 0;
+                    }
+                    drops[i]++;
+                }
+            }
+
+            matrixInterval = setInterval(draw, 50);
+        }
+
+        function stopMatrixRain() {
+            clearInterval(matrixInterval);
+            const canvas = document.getElementById('matrix-rain');
+            if (canvas) {
+                canvas.remove();
+            }
+        }
+
+        function showElapsedTime() {
+            startTime = new Date();
+            elapsedInterval = setInterval(() => {
+                const now = new Date();
+                const elapsed = new Date(now - startTime);
+                const hours = elapsed.getUTCHours().toString().padStart(2, '0');
+                const minutes = elapsed.getUTCMinutes().toString().padStart(2, '0');
+                const seconds = elapsed.getUTCSeconds().toString().padStart(2, '0');
+                output.textContent = `Elapsed time: ${hours}:${minutes}:${seconds}`;
+            }, 1000);
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey) {
+                switch (e.key) {
+                    case 'm':
+                        e.preventDefault();
+                        handleCommand('matrix');
+                        break;
+                    case 'e':
+                        e.preventDefault();
+                        handleCommand('elapsed');
+                        break;
+                    case 's':
+                        e.preventDefault();
+                        startGUIMode();
+                        break;
+                    case 't':
+                        e.preventDefault();
+                        returnToTerminal();
+                        break;
+                    case 'd':
+                        e.preventDefault();
+                        handleCommand('3d');
+                        break;
+                    case 'p':
+                        e.preventDefault();
+                        handleCommand('python');
+                        break;
+                    case 'v':
+                        e.preventDefault();
+                        handleCommand('neovim');
+                        break;
+                }
+            }
+        });
+
+        // Resize event listener for 3D animation
+        window.addEventListener('resize', () => {
+            if (camera && renderer) {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+        });
+
+        // Python in browser
+        let pyodide;
+
+        async function initPyodide() {
+            pyodide = await loadPyodide();
+            console.log("Pyodide loaded successfully");
+        }
+
+        async function runPythonCode() {
+            if (!pyodide) {
+                await initPyodide();
+            }
+            const code = document.getElementById('code-editor').value;
+            const outputDiv = document.getElementById('python-output');
+            try {
+                const result = await pyodide.runPythonAsync(code);
+                outputDiv.textContent = result;
+            } catch (error) {
+                outputDiv.textContent = `Error: ${error.message}`;
+            }
+        }
+
+        // Neovim-like editor
+        function startNeovimEditor() {
+            // This is a placeholder for Neovim-like functionality
+            // You would need to implement a more complex editor to truly emulate Neovim
+            alert("Neovim-like editor functionality is not yet implemented.");
+        }
+
+        // Initialize and start the boot sequence
+        init3DAnimation();
+        animate3D();
+        simulateBooting();
+        initPyodide();
+    </script>
+</body>
+</html>
